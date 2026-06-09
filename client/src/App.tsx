@@ -1,9 +1,39 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuthStore } from './stores/authStore';
+import Login from './pages/Login';
+import Calendars from './pages/Calendars';
+import CalendarDetail from './pages/CalendarDetail';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const token = useAuthStore((s) => s.token);
+  if (!token) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
 function App() {
   return (
-    <div>
-      <h1>Balendar</h1>
-      <p>乐队协作日历</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/calendars"
+          element={
+            <ProtectedRoute>
+              <Calendars />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/calendars/:id"
+          element={
+            <ProtectedRoute>
+              <CalendarDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/calendars" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

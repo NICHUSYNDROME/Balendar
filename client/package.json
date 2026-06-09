@@ -10,8 +10,12 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
+    "axios": "^1.17.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.17.0",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
