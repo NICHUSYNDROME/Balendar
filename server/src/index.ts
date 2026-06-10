@@ -30,7 +30,7 @@ async function main() {
   // 生产环境: 注册静态文件服务
   if (process.env.NODE_ENV === 'production') {
     await server.register(fastifyStatic, {
-      root: path.join(__dirname, '../../client/dist'),
+      root: path.join(__dirname, '../../../client/dist'),
       wildcard: false,
     });
   }
