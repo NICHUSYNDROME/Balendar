@@ -5,30 +5,42 @@ const BUCKET = 'balendar-files';
 const INTERNAL_ENDPOINT = 'oss-cn-chengdu-internal.aliyuncs.com';
 const EXTERNAL_ENDPOINT = 'oss-cn-chengdu.aliyuncs.com';
 
-let client: any = null;
+let internalClient: any = null;
+let externalClient: any = null;
 
-function getClient(): any {
-  if (!client) {
-    const accessKeyId = process.env.OSS_ACCESS_KEY_ID;
-    const accessKeySecret = process.env.OSS_ACCESS_KEY_SECRET;
-    if (!accessKeyId || !accessKeySecret) {
-      throw new Error('OSS_ACCESS_KEY_ID and OSS_ACCESS_KEY_SECRET must be set');
+function getClient(internal = false): any {
+  const accessKeyId = process.env.OSS_ACCESS_KEY_ID;
+  const accessKeySecret = process.env.OSS_ACCESS_KEY_SECRET;
+  if (!accessKeyId || !accessKeySecret) {
+    throw new Error('OSS_ACCESS_KEY_ID and OSS_ACCESS_KEY_SECRET must be set');
+  }
+  if (internal) {
+    if (!internalClient) {
+      internalClient = new OSS({
+        region: REGION,
+        accessKeyId,
+        accessKeySecret,
+        bucket: BUCKET,
+        endpoint: INTERNAL_ENDPOINT,
+        internal: true,
+      });
     }
-    const isInternal = process.env.OSS_INTERNAL === 'true' || process.env.NODE_ENV === 'production';
-    client = new OSS({
+    return internalClient;
+  }
+  if (!externalClient) {
+    externalClient = new OSS({
       region: REGION,
       accessKeyId,
       accessKeySecret,
       bucket: BUCKET,
-      endpoint: isInternal ? INTERNAL_ENDPOINT : EXTERNAL_ENDPOINT,
-      internal: isInternal,
+      endpoint: EXTERNAL_ENDPOINT,
     });
   }
-  return client;
+  return externalClient;
 }
 
 /**
- * 生成上传签名 URL（前端直传 OSS 用）
+ * 生成上传签名 URL（前端直传 OSS 用 — 始终用公网 Endpoint）
  */
 export async function getUploadUrl(
   fileName: string,
@@ -36,7 +48,7 @@ export async function getUploadUrl(
   expiresSeconds = 300,
 ): Promise<{ uploadUrl: string; fileUrl: string }> {
   const storeKey = `songs/${songId}/${fileName}`;
-  const url = getClient().signatureUrl(storeKey, {
+  const url = getClient(false).signatureUrl(storeKey, {
     method: 'PUT',
     expires: expiresSeconds,
   });
@@ -47,28 +59,26 @@ export async function getUploadUrl(
 }
 
 /**
- * 生成下载/查看签名 URL
+ * 生成下载/查看签名 URL（始终用公网 Endpoint，供浏览器使用）
  */
 export async function getDownloadUrl(
   storeKey: string,
   expiresSeconds = 3600,
 ): Promise<string> {
-  return getClient().signatureUrl(storeKey, {
+  return getClient(false).signatureUrl(storeKey, {
     expires: expiresSeconds,
   });
 }
 
 /**
- * 删除 OSS 文件
+ * 删除 OSS 文件（服务端操作，用内网减少延迟）
  */
 export async function deleteFile(storeKey: string): Promise<void> {
-  await getClient().delete(storeKey);
+  await getClient(true).delete(storeKey);
 }
 
 /**
  * 从 fileUrl 中提取 storeKey
- * 例: https://balendar-files.oss-cn-chengdu.aliyuncs.com/songs/xxx/file.pdf
- *     → songs/xxx/file.pdf
  */
 export function extractStoreKey(fileUrl: string): string {
   const prefix = `https://${BUCKET}.${EXTERNAL_ENDPOINT}/`;
