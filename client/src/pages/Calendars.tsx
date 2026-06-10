@@ -68,9 +68,14 @@ export default function Calendars() {
             {user?.nickname || user?.username} · {user?.role}
           </p>
         </div>
-        <button onClick={logout} style={logoutBtnStyle}>
-          退出
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={() => navigate('/songs')} style={navBtnStyle}>
+            🎵 歌曲库
+          </button>
+          <button onClick={logout} style={logoutBtnStyle}>
+            退出
+          </button>
+        </div>
       </div>
 
       {/* 创建日历（仅 admin） */}
@@ -147,6 +152,17 @@ const centerStyle: React.CSSProperties = {
   alignItems: 'center',
   minHeight: '100vh',
   color: '#666',
+};
+
+const navBtnStyle: React.CSSProperties = {
+  background: '#e0e7ff',
+  color: '#4338ca',
+  border: 'none',
+  padding: '8px 16px',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontSize: '13px',
+  fontWeight: 600,
 };
 
 const logoutBtnStyle: React.CSSProperties = {

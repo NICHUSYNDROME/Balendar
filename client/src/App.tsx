@@ -5,6 +5,7 @@ import Calendars from './pages/Calendars';
 import CalendarDetail from './pages/CalendarDetail';
 import Gigs from './pages/Gigs';
 import GigDetail from './pages/GigDetail';
+import Songs from './pages/Songs';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -46,6 +47,14 @@ function App() {
           element={
             <ProtectedRoute>
               <GigDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/songs"
+          element={
+            <ProtectedRoute>
+              <Songs />
             </ProtectedRoute>
           }
         />

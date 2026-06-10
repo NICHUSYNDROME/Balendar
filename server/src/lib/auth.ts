@@ -28,3 +28,19 @@ export async function requireAdmin(
   }
   return user;
 }
+
+export async function requireAdminOrManager(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<JwtPayload | null> {
+  const user = getAuthUser(request);
+  if (!user) {
+    reply.status(401).send({ error: '未提供认证令牌或令牌无效' });
+    return null;
+  }
+  if (user.role === 'musician') {
+    reply.status(403).send({ error: '权限不足，需要管理员或管理者角色' });
+    return null;
+  }
+  return user;
+}
