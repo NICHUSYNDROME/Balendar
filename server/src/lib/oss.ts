@@ -3,7 +3,8 @@ import OSS from 'ali-oss';
 const REGION = 'oss-cn-chengdu';
 const BUCKET = 'balendar-files';
 const INTERNAL_ENDPOINT = 'oss-cn-chengdu-internal.aliyuncs.com';
-const EXTERNAL_ENDPOINT = 'oss-cn-chengdu.aliyuncs.com';
+const EXTERNAL_HOST = 'balendar-files.oss-cn-chengdu.aliyuncs.com';
+const EXTERNAL_ENDPOINT = `https://${EXTERNAL_HOST}`;
 
 let internalClient: any = null;
 let externalClient: any = null;
@@ -34,6 +35,7 @@ function getClient(internal = false): any {
       accessKeySecret,
       bucket: BUCKET,
       endpoint: EXTERNAL_ENDPOINT,
+      secure: true,
     });
   }
   return externalClient;
@@ -54,7 +56,7 @@ export async function getUploadUrl(
   });
   return {
     uploadUrl: url,
-    fileUrl: `https://${BUCKET}.${EXTERNAL_ENDPOINT}/${storeKey}`,
+    fileUrl: `https://${EXTERNAL_HOST}/${storeKey}`,
   };
 }
 
@@ -81,7 +83,7 @@ export async function deleteFile(storeKey: string): Promise<void> {
  * 从 fileUrl 中提取 storeKey
  */
 export function extractStoreKey(fileUrl: string): string {
-  const prefix = `https://${BUCKET}.${EXTERNAL_ENDPOINT}/`;
+  const prefix = `https://${EXTERNAL_HOST}/`;
   if (fileUrl.startsWith(prefix)) {
     return fileUrl.slice(prefix.length);
   }
