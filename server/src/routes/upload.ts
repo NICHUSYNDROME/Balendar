@@ -57,7 +57,7 @@ export async function uploadRoutes(app: FastifyInstance) {
     try {
       const storeKey = extractStoreKey(file.file_url);
       const signedUrl = await getDownloadUrl(storeKey);
-      return reply.redirect(signedUrl);
+      return { data: { downloadUrl: signedUrl } };
     } catch (err: any) {
       request.log.error(err);
       return reply.status(500).send({ error: '获取下载链接失败' });

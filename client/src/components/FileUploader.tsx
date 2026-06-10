@@ -96,6 +96,20 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
     }
   };
 
+  const handleDownload = async (file: SongFile) => {
+    try {
+      const res = await api.get(`/files/${file.id}/download`);
+      const signedUrl = res.data?.data?.downloadUrl;
+      if (signedUrl) {
+        window.open(signedUrl, '_blank');
+      } else {
+        window.open(file.file_url, '_blank');
+      }
+    } catch {
+      window.open(file.file_url, '_blank');
+    }
+  };
+
   const fileChips = files.map(f => FILE_TYPE_LABELS[f.file_type] || '📄 其他');
 
   return (
@@ -205,9 +219,8 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ marginRight: 6 }}>{FILE_TYPE_LABELS[file.file_type] || '📄 其他'}</span>
                       <a
-                        href={`/api/files/${file.id}/download`}
-                        target="_blank" rel="noreferrer"
-                        style={{ color: '#1677ff', wordBreak: 'break-all' }}
+                        style={{ color: '#1677ff', wordBreak: 'break-all', cursor: 'pointer' }}
+                        onClick={() => handleDownload(file)}
                       >
                         {file.original_name}
                       </a>
