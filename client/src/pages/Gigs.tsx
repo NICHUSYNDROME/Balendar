@@ -8,6 +8,8 @@ import type { EventClickArg, DateSelectArg } from '@fullcalendar/core';
 import '@fullcalendar/core/locales/zh-cn';
 import api from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
+import TimePicker from '../components/TimePicker';
+import { fromBeijingTime, formatBeijingShort } from '../lib/time';
 
 interface Gig {
   id: string;
@@ -33,7 +35,7 @@ interface Calendar {
 }
 
 export default function Gigs() {
-  const { id: calendarId } = useParams<{ id: string }>();
+  const { calendarId } = useParams<{ calendarId: string }>();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
 
@@ -43,8 +45,9 @@ export default function Gigs() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({
     title: '',
-    start_time: '',
-    end_time: '',
+    date: '',
+    start_time: '19:00',
+    end_time: '22:00',
     location: '',
     notes: '',
   });
@@ -93,13 +96,24 @@ export default function Gigs() {
 
   const handleDateSelect = (info: DateSelectArg) => {
     if (!canEdit) return;
-    // 预填时间
-    const startStr = info.startStr;
-    const endStr = info.endStr;
+    // 判断是否包含时间（周视图点击有时分）
+    const hasTime = info.startStr.length > 10;
+    const dateStr = info.startStr.slice(0, 10);
+    const startTime = hasTime ? info.startStr.slice(11, 16) : '19:00';
+    // 结束时间取 select 的 end 或开始+3小时
+    let endTime = '22:00';
+    if (hasTime && info.endStr && info.endStr.length > 10) {
+      endTime = info.endStr.slice(11, 16);
+    } else if (hasTime) {
+      const [h, m] = startTime.split(':').map(Number);
+      const eh = h + 3;
+      endTime = `${String(eh > 23 ? 23 : eh).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
     setForm({
       title: '',
-      start_time: startStr,
-      end_time: endStr,
+      date: dateStr,
+      start_time: startTime,
+      end_time: endTime,
       location: '',
       notes: '',
     });
@@ -108,18 +122,24 @@ export default function Gigs() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title.trim() || !calendarId) return;
+    if (!form.title.trim() || !calendarId || !form.date) return;
+    if (form.start_time >= form.end_time) {
+      alert('结束时间必须晚于开始时间');
+      return;
+    }
     try {
+      const startISO = fromBeijingTime(form.date, form.start_time || '19:00');
+      const endISO = fromBeijingTime(form.date, form.end_time || '22:00');
       await api.post('/gigs', {
         calendar_id: calendarId,
         title: form.title.trim(),
-        start_time: new Date(form.start_time).toISOString(),
-        end_time: new Date(form.end_time).toISOString(),
+        start_time: startISO,
+        end_time: endISO,
         location: form.location.trim() || undefined,
         notes: form.notes.trim() || undefined,
       });
       setShowCreate(false);
-      setForm({ title: '', start_time: '', end_time: '', location: '', notes: '' });
+      setForm({ title: '', date: '', start_time: '', end_time: '', location: '', notes: '' });
       await fetchGigs();
     } catch {
       alert('创建失败');
@@ -149,11 +169,12 @@ export default function Gigs() {
           <button
             onClick={() => {
               const now = new Date();
-              const nextHour = new Date(now.getTime() + 3600000);
+              const dateStr = now.toISOString().slice(0, 10);
               setForm({
                 title: '',
-                start_time: now.toISOString().slice(0, 16),
-                end_time: nextHour.toISOString().slice(0, 16),
+                date: dateStr,
+                start_time: '19:00',
+                end_time: '22:00',
                 location: '',
                 notes: '',
               });
@@ -195,12 +216,7 @@ export default function Gigs() {
                 )}
               </span>
               <span style={{ color: '#666' }}>
-                {new Date(gig.start_time).toLocaleDateString('zh-CN', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatBeijingShort(gig.start_time)}
                 {gig.participants.length > 0 && (
                   <span style={{ marginLeft: '8px', color: '#999' }}>
                     👥 {gig.participants.length}
@@ -253,26 +269,24 @@ export default function Gigs() {
                   autoFocus
                 />
               </div>
+              <div style={fieldStyle}>
+                <label>日期 *</label>
+                <input
+                  type="date"
+                  style={inputStyle}
+                  value={form.date}
+                  onChange={(e) => setForm({ ...form, date: e.target.value })}
+                  required
+                />
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={fieldStyle}>
-                  <label>开始时间 *</label>
-                  <input
-                    type="datetime-local"
-                    style={inputStyle}
-                    value={form.start_time}
-                    onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                    required
-                  />
+                  <label>开始时间</label>
+                  <TimePicker value={form.start_time} onChange={(v) => setForm({ ...form, start_time: v })} />
                 </div>
                 <div style={fieldStyle}>
-                  <label>结束时间 *</label>
-                  <input
-                    type="datetime-local"
-                    style={inputStyle}
-                    value={form.end_time}
-                    onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                    required
-                  />
+                  <label>结束时间</label>
+                  <TimePicker value={form.end_time} onChange={(v) => setForm({ ...form, end_time: v })} />
                 </div>
               </div>
               <div style={fieldStyle}>

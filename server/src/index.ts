@@ -9,6 +9,7 @@ import { userRoutes } from './routes/users';
 import { calendarRoutes } from './routes/calendars';
 import { gigRoutes } from './routes/gigs';
 import { songRoutes } from './routes/songs';
+import { messageRoutes } from './routes/messages';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -45,6 +46,7 @@ async function main() {
   await server.register(calendarRoutes);
   await server.register(gigRoutes);
   await server.register(songRoutes);
+  await server.register(messageRoutes);
 
   // SPA fallback: 前端路由返回 index.html
   if (process.env.NODE_ENV === 'production') {

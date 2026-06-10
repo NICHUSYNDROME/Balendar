@@ -46,7 +46,7 @@ const setlistItemSchema = z.discriminatedUnion('type', [
   z.object({
     order: z.number().int().min(0),
     type: z.literal('game'),
-    description: z.string().min(1, '描述不能为空'),
+    description: z.string().optional(),
   }),
 ]);
 

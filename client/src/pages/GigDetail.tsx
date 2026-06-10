@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
 import SetlistEditor from '../components/SetlistEditor';
+import TimePicker from '../components/TimePicker';
+import GigMessages from '../components/GigMessages';
+import { toBeijingTime, fromBeijingTime, formatBeijing } from '../lib/time';
 
 interface Participant {
   user_id: string;
@@ -46,8 +49,9 @@ export default function GigDetail() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     title: '',
-    start_time: '',
-    end_time: '',
+    date: '',
+    start_time: '19:00',
+    end_time: '22:00',
     location: '',
     notes: '',
   });
@@ -65,10 +69,13 @@ export default function GigDetail() {
       .then((res) => {
         const g = res.data.data;
         setGig(g);
+        const { date, time: startTime } = toBeijingTime(g.start_time);
+        const { time: endTime } = toBeijingTime(g.end_time);
         setForm({
           title: g.title,
-          start_time: g.start_time.slice(0, 16),
-          end_time: g.end_time.slice(0, 16),
+          date,
+          start_time: startTime,
+          end_time: endTime,
           location: g.location || '',
           notes: g.notes || '',
         });
@@ -85,11 +92,18 @@ export default function GigDetail() {
 
   const handleSave = async () => {
     if (!gigId) return;
+    if (!form.date) { alert('请选择日期'); return; }
+    if (form.start_time >= form.end_time) {
+      alert('结束时间必须晚于开始时间');
+      return;
+    }
     try {
+      const startISO = fromBeijingTime(form.date, form.start_time);
+      const endISO = fromBeijingTime(form.date, form.end_time);
       const res = await api.put(`/gigs/${gigId}`, {
         title: form.title.trim(),
-        start_time: new Date(form.start_time).toISOString(),
-        end_time: new Date(form.end_time).toISOString(),
+        start_time: startISO,
+        end_time: endISO,
         location: form.location.trim() || null,
         notes: form.notes.trim() || '',
       });
@@ -143,17 +157,6 @@ export default function GigDetail() {
   const participantIds = new Set(gig.participants.map((p) => p.user_id));
   const availableUsers = allUsers.filter((u) => !participantIds.has(u.id));
 
-  // 格式化日期时间
-  const formatDateTime = (iso: string) =>
-    new Date(iso).toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
   return (
     <div style={{ maxWidth: '720px', margin: '0 auto', padding: '24px' }}>
       <button onClick={() => navigate(backUrl)} style={linkBtnStyle}>
@@ -168,14 +171,18 @@ export default function GigDetail() {
             <label>标题 *</label>
             <input style={inputStyle} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           </div>
+          <div style={fieldStyle}>
+            <label>日期 *</label>
+            <input type="date" style={inputStyle} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} required />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div style={fieldStyle}>
-              <label>开始时间 *</label>
-              <input type="datetime-local" style={inputStyle} value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+              <label>开始时间</label>
+              <TimePicker value={form.start_time} onChange={(v) => setForm({ ...form, start_time: v })} />
             </div>
             <div style={fieldStyle}>
-              <label>结束时间 *</label>
-              <input type="datetime-local" style={inputStyle} value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
+              <label>结束时间</label>
+              <TimePicker value={form.end_time} onChange={(v) => setForm({ ...form, end_time: v })} />
             </div>
           </div>
           <div style={fieldStyle}>
@@ -211,11 +218,11 @@ export default function GigDetail() {
           <div style={{ ...infoCardStyle, marginTop: '20px' }}>
             <div style={infoRowStyle}>
               <span style={infoLabelStyle}>🕐 开始</span>
-              <span>{formatDateTime(gig.start_time)}</span>
+              <span>{formatBeijing(gig.start_time)}</span>
             </div>
             <div style={infoRowStyle}>
               <span style={infoLabelStyle}>🕐 结束</span>
-              <span>{formatDateTime(gig.end_time)}</span>
+              <span>{formatBeijing(gig.end_time)}</span>
             </div>
           </div>
 
@@ -346,9 +353,16 @@ export default function GigDetail() {
             </div>
           )}
 
+          {/* 留言板 */}
+          {gig && (
+            <div style={{ marginTop: '16px' }}>
+              <GigMessages gigId={gig.id} />
+            </div>
+          )}
+
           {/* 时间戳 */}
           <div style={{ color: '#999', fontSize: '12px', marginTop: '16px', textAlign: 'center' }}>
-            创建于 {formatDateTime(gig.created_at)} · 更新于 {formatDateTime(gig.updated_at)}
+            创建于 {formatBeijing(gig.created_at)} · 更新于 {formatBeijing(gig.updated_at)}
           </div>
         </div>
       )}

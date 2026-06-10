@@ -32,6 +32,31 @@ const actualKey = (original: string | undefined, transpose: number | undefined):
   return displayKey(KEY_OPTIONS[newIdx]);
 };
 
+/** 将歌单项按 Part 分组：break/game 作为前一个 Part 的结尾，之后的第一首歌开启新 Part */
+function computeParts(items: SetlistItem[]): SetlistItem[][] {
+  const parts: SetlistItem[][] = [];
+  let current: SetlistItem[] = [];
+  for (const item of items) {
+    if (item.type === 'song') {
+      if (current.length > 0 && current.some((x) => x.type !== 'song')) {
+        parts.push([...current]);
+        current = [item];
+      } else {
+        current.push(item);
+      }
+    } else {
+      current.push(item);
+    }
+  }
+  if (current.length > 0) parts.push(current);
+  // 如果第一个 Part 没有歌曲，合并到第二个 Part
+  if (parts.length >= 2 && parts[0].every((x) => x.type !== 'song')) {
+    parts[1] = [...parts[0], ...parts[1]];
+    parts.shift();
+  }
+  return parts;
+}
+
 // ==================== 只读行 ====================
 
 function ReadonlyRow({ item }: { item: SetlistItem }) {
@@ -62,36 +87,46 @@ function ReadonlyRow({ item }: { item: SetlistItem }) {
       </div>
     );
   }
-  return (
-    <div style={{ padding: '8px 0', borderBottom: '1px solid #f3f4f6', fontSize: '14px', color: '#6d28d9' }}>
-      🎮 游戏环节 — {item.description}
-    </div>
-  );
+  if (item.type === 'game') {
+    return (
+      <div style={{ padding: '8px 0', borderBottom: '1px solid #f3f4f6', fontSize: '14px', color: '#6d28d9' }}>
+        🎮 游戏环节{item.description ? ` — ${item.description}` : ''}
+      </div>
+    );
+  }
+  return null;
 }
 
 // ==================== 编辑行（歌曲只读曲名/歌手，仅可调移调和备注）====================
 
 function EditItemRow({
-  item, index, onUpdate, onRemove, onMoveUp, onMoveDown, isFirst, isLast,
+  item, index, onUpdate, onRemove, onDragStart, onDragOver, onDrop, isDragging,
 }: {
   item: SetlistItem; index: number;
   onUpdate: (idx: number, partial: Partial<SetlistItem>) => void;
   onRemove: (idx: number) => void;
-  onMoveUp: (idx: number) => void;
-  onMoveDown: (idx: number) => void;
-  isFirst: boolean; isLast: boolean;
+  onDragStart: (e: React.DragEvent, idx: number) => void;
+  onDragOver: (e: React.DragEvent, idx: number) => void;
+  onDrop: (e: React.DragEvent, idx: number) => void;
+  isDragging: boolean;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 0', borderBottom: '1px solid #f3f4f6' }}>
-      {/* 序号 + 移动 */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', minWidth: '20px' }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: '20px', height: '20px', borderRadius: '50%',
-          background: '#e5e7eb', color: '#555', fontSize: '11px', fontWeight: 700,
-        }}>{index + 1}</span>
-        <button onClick={() => onMoveUp(index)} disabled={isFirst} style={moveBtnStyle}>▲</button>
-        <button onClick={() => onMoveDown(index)} disabled={isLast} style={moveBtnStyle}>▼</button>
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, index)}
+      onDragOver={(e) => onDragOver(e, index)}
+      onDrop={(e) => onDrop(e, index)}
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px 0',
+        borderBottom: '1px solid #f3f4f6', opacity: isDragging ? 0.4 : 1,
+        transition: 'opacity 0.15s',
+      }}
+    >
+      {/* 拖拽把手 */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '20px', cursor: 'grab',
+      }}>
+        <span style={{ fontSize: '16px', color: '#9ca3af', lineHeight: 1, userSelect: 'none' }}>⠿</span>
       </div>
 
       <div style={{ flex: 1 }}>
@@ -184,8 +219,11 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
   const [search, setSearch] = useState('');
   const [songs, setSongs] = useState<Song[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [showNewSong, setShowNewSong] = useState(false);
   const [newSongForm, setNewSongForm] = useState({ name: '', artist: '', original_keys: [] as string[] });
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   useEffect(() => { setItems(initialItems); }, [initialItems]);
 
@@ -206,6 +244,23 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
     setEditItems(JSON.parse(JSON.stringify(items)));
     setSearch(''); setSongs([]); setShowNewSong(false);
     setShowEditor(true);
+  };
+
+  const handleSearchFocus = () => {
+    setSearchFocused(true);
+    // 如果已有搜索词，立即搜索
+    if (search.trim()) {
+      setSearching(true);
+      api.get('/songs', { params: { q: search.trim() } })
+        .then((res) => setSongs(res.data.data))
+        .catch(() => {})
+        .finally(() => setSearching(false));
+    }
+  };
+
+  const handleSearchClear = () => {
+    setSearch('');
+    setSongs([]);
   };
 
   const addSongFromLibrary = (song: Song) => {
@@ -239,12 +294,33 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
     setEditItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const moveItem = (index: number, dir: -1 | 1) => {
-    const t = index + dir;
-    if (t < 0 || t >= editItems.length) return;
+  // 拖拽排序
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    setDragIndex(idx);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', String(idx));
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(idx);
+  };
+
+  const handleDrop = (e: React.DragEvent, toIdx: number) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === toIdx) return;
     const next = [...editItems];
-    [next[index], next[t]] = [next[t], next[index]];
+    const [moved] = next.splice(dragIndex, 1);
+    next.splice(toIdx, 0, moved);
     setEditItems(next);
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
   };
 
   const save = async () => {
@@ -274,16 +350,22 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
   };
 
   const renderSearchDropdown = () => {
-    if (!search.trim()) return null;
+    // 未获取焦点且无搜索内容时隐藏
+    if (!searchFocused && !search.trim()) return null;
+
+    const hasSearch = search.trim().length > 0;
+
     return (
       <div style={{
         marginTop: '4px', border: '1px solid #e5e7eb', borderRadius: '8px',
         background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-        maxHeight: '240px', overflowY: 'auto',
+        maxHeight: '280px', overflowY: 'auto',
       }}>
-        {searching ? (
+        {hasSearch && searching && (
           <div style={{ padding: '12px', textAlign: 'center', color: '#999', fontSize: '13px' }}>搜索中...</div>
-        ) : songs.length > 0 ? (
+        )}
+
+        {hasSearch && !searching && songs.length > 0 && (
           songs.map((song) => {
             const added = isInSetlist(song.id);
             return (
@@ -319,49 +401,27 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
               </div>
             );
           })
-        ) : (
+        )}
+
+        {hasSearch && !searching && songs.length === 0 && (
           <div style={{ padding: '12px', textAlign: 'center', color: '#999', fontSize: '13px' }}>未找到匹配歌曲</div>
+        )}
+
+        {!hasSearch && (
+          <div style={{ padding: '12px', textAlign: 'center', color: '#999', fontSize: '13px' }}>
+            输入曲名或歌手搜索歌曲
+          </div>
         )}
 
         {/* 添加新歌到曲库 */}
         <div style={{ borderTop: '1px solid #e5e7eb' }}>
-          {showNewSong ? (
-            <div style={{ padding: '12px' }}>
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-                <input placeholder="曲名" value={newSongForm.name}
-                  onChange={(e) => setNewSongForm({ ...newSongForm, name: e.target.value })}
-                  style={editInputStyle} />
-                <input placeholder="歌手" value={newSongForm.artist}
-                  onChange={(e) => setNewSongForm({ ...newSongForm, artist: e.target.value })}
-                  style={{ ...editInputStyle, width: '120px' }} />
-              </div>
-              <div style={{ marginBottom: '8px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '4px' }}>原调</label>
-                <CircleKeySelector
-                  value={newSongForm.original_keys}
-                  onChange={(keys) => setNewSongForm({ ...newSongForm, original_keys: keys })}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button onClick={handleNewSongSave}
-                  style={{ background: '#059669', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                  保存并添加到歌单
-                </button>
-                <button onClick={() => setShowNewSong(false)}
-                  style={{ background: '#f3f4f6', border: '1px solid #ddd', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }}>
-                  取消
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div onClick={() => setShowNewSong(true)} style={{
-              padding: '10px 14px', cursor: 'pointer', color: '#059669', fontWeight: 600, fontSize: '13px',
-            }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}>
-              + 添加新歌到曲库
-            </div>
-          )}
+          <div onClick={() => { setShowNewSong(true); setSearchFocused(false); }} style={{
+            padding: '10px 14px', cursor: 'pointer', color: '#059669', fontWeight: 600, fontSize: '13px',
+          }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = '#f0fdf4'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}>
+            + 添加新歌到曲库
+          </div>
         </div>
       </div>
     );
@@ -383,16 +443,40 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
         <p style={{ color: '#999', fontSize: '13px', textAlign: 'center', padding: '16px 0' }}>暂无歌单</p>
       ) : (
         <div>
-          {items.map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: '20px', height: '20px', borderRadius: '50%', marginTop: '8px',
-                background: '#e5e7eb', color: '#555', fontSize: '11px', fontWeight: 700, flexShrink: 0,
-              }}>{i + 1}</span>
-              <div style={{ flex: 1 }}><ReadonlyRow item={item} /></div>
-            </div>
-          ))}
+          {(() => {
+            const parts = computeParts(items);
+            let globalSongCount = 0;
+            return parts.map((part, pIdx) => (
+              <div key={pIdx}>
+                {parts.length > 1 && (
+                  <div style={{
+                    fontSize: '12px', fontWeight: 700, color: '#64748b',
+                    padding: '8px 0 4px', letterSpacing: '0.5px',
+                    borderTop: pIdx > 0 ? '1px dashed #e2e8f0' : 'none',
+                    marginTop: pIdx > 0 ? '8px' : 0,
+                  }}>
+                    Part {pIdx + 1}
+                  </div>
+                )}
+                {part.map((item, i) => {
+                  if (item.type === 'song') {
+                    globalSongCount++;
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: '20px', height: '20px', borderRadius: '50%', marginTop: '8px',
+                          background: '#e5e7eb', color: '#555', fontSize: '11px', fontWeight: 700, flexShrink: 0,
+                        }}>{globalSongCount}</span>
+                        <div style={{ flex: 1 }}><ReadonlyRow item={item} /></div>
+                      </div>
+                    );
+                  }
+                  return <div key={i} style={{ paddingLeft: '28px' }}><ReadonlyRow item={item} /></div>;
+                })}
+              </div>
+            ));
+          })()}
         </div>
       )}
 
@@ -412,12 +496,14 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
               <div style={{ position: 'relative' }}>
                 <input autoFocus placeholder="搜索曲名或歌手..." value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  onFocus={handleSearchFocus}
+                  onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
                   style={{
                     width: '100%', padding: '10px 36px 10px 14px', borderRadius: '8px',
                     border: '1px solid #ddd', fontSize: '14px', outline: 'none',
                   }} />
                 {search && (
-                  <button onClick={() => { setSearch(''); setSongs([]); }}
+                  <button onClick={handleSearchClear}
                     style={{
                       position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
                       background: 'none', border: 'none', color: '#999', cursor: 'pointer',
@@ -435,14 +521,66 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
             <div style={{ flex: 1, overflowY: 'auto', padding: '0 20px' }}>
               {editItems.length === 0 ? (
                 <p style={{ color: '#999', fontSize: '13px', textAlign: 'center', padding: '24px 0' }}>歌单为空，在上方搜索添加歌曲</p>
-              ) : (
-                editItems.map((item, i) => (
-                  <EditItemRow key={i} item={item} index={i}
-                    onUpdate={updateItem} onRemove={removeItem}
-                    onMoveUp={(idx) => moveItem(idx, -1)} onMoveDown={(idx) => moveItem(idx, 1)}
-                    isFirst={i === 0} isLast={i === editItems.length - 1} />
-                ))
-              )}
+              ) : (() => {
+                const parts = computeParts(editItems);
+                let globalSongCount = 0;
+                return parts.map((part, pIdx) => {
+                  const partElements: React.ReactNode[] = [];
+                  partElements.push(
+                    <div key={pIdx}>
+                      {parts.length > 1 && (
+                        <div style={{
+                          fontSize: '12px', fontWeight: 700, color: '#64748b',
+                          padding: '8px 0 4px', letterSpacing: '0.5px',
+                          borderTop: pIdx > 0 ? '1px dashed #e2e8f0' : 'none',
+                          marginTop: pIdx > 0 ? '8px' : 0,
+                        }}>
+                          Part {pIdx + 1}
+                        </div>
+                      )}
+                      {part.map((item) => {
+                        const globalIdx = editItems.indexOf(item);
+                        if (item.type === 'song') {
+                          globalSongCount++;
+                          return (
+                            <div key={globalIdx} onDragEnd={handleDragEnd}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                ...(dragOverIndex === globalIdx && dragIndex !== globalIdx ? { borderTop: '2px solid #3b82f6' } : {}),
+                              }}>
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0,
+                                background: '#e5e7eb', color: '#555', fontSize: '11px', fontWeight: 700,
+                              }}>{globalSongCount}</span>
+                              <div style={{ flex: 1 }}>
+                                <EditItemRow item={item} index={globalIdx}
+                                  onUpdate={updateItem} onRemove={removeItem}
+                                  onDragStart={handleDragStart}
+                                  onDragOver={handleDragOver}
+                                  onDrop={handleDrop}
+                                  isDragging={dragIndex === globalIdx} />
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={globalIdx} onDragEnd={handleDragEnd}
+                            style={{ paddingLeft: '26px', ...(dragOverIndex === globalIdx && dragIndex !== globalIdx ? { borderTop: '2px solid #3b82f6' } : {}) }}>
+                            <EditItemRow item={item} index={globalIdx}
+                              onUpdate={updateItem} onRemove={removeItem}
+                              onDragStart={handleDragStart}
+                              onDragOver={handleDragOver}
+                              onDrop={handleDrop}
+                              isDragging={dragIndex === globalIdx} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                  return partElements;
+                });
+              })()}
             </div>
 
             <div style={{ padding: '16px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -458,16 +596,55 @@ export default function SetlistEditor({ gigId, initialItems, onSaved, canEdit }:
           </div>
         </div>
       )}
+
+      {/* 添加新歌到曲库弹窗 */}
+      {showNewSong && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300,
+        }} onClick={() => { setShowNewSong(false); setNewSongForm({ name: '', artist: '', original_keys: [] }); }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: '#fff', borderRadius: '12px', width: '440px', maxWidth: '90vw',
+            padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          }}>
+            <h2 style={{ fontSize: '18px', margin: '0 0 16px' }}>添加新歌到曲库</h2>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '4px' }}>曲名 *</label>
+              <input autoFocus placeholder="曲名" value={newSongForm.name}
+                onChange={(e) => setNewSongForm({ ...newSongForm, name: e.target.value })}
+                style={editInputStyle} />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '4px' }}>歌手 *</label>
+              <input placeholder="歌手" value={newSongForm.artist}
+                onChange={(e) => setNewSongForm({ ...newSongForm, artist: e.target.value })}
+                style={{ ...editInputStyle, width: '100%' }} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: '#555', display: 'block', marginBottom: '4px' }}>原调</label>
+              <CircleKeySelector
+                value={newSongForm.original_keys}
+                onChange={(keys) => setNewSongForm({ ...newSongForm, original_keys: keys })}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowNewSong(false); setNewSongForm({ name: '', artist: '', original_keys: [] }); }}
+                style={{ background: '#f3f4f6', border: '1px solid #ddd', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>
+                取消
+              </button>
+              <button onClick={handleNewSongSave}
+                style={{ background: '#059669', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: 600 }}>
+                保存并添加到歌单
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ==================== Styles ====================
-
-const moveBtnStyle: React.CSSProperties = {
-  background: 'none', border: 'none', cursor: 'pointer',
-  color: '#9ca3af', fontSize: '8px', lineHeight: 1, padding: '1px',
-};
 
 const editInputStyle: React.CSSProperties = {
   border: '1px solid #d1d5db', borderRadius: '4px', padding: '4px 8px',
