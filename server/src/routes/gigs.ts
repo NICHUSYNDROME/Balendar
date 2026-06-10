@@ -25,6 +25,35 @@ const addParticipantSchema = z.object({
   user_id: z.string().uuid(),
 });
 
+// Setlist 校验
+const setlistItemSchema = z.discriminatedUnion('type', [
+  z.object({
+    order: z.number().int().min(0),
+    type: z.literal('song'),
+    song_id: z.string().uuid().optional(),
+    song_name: z.string().min(1, '曲名不能为空'),
+    artist: z.string().min(1, '歌手不能为空'),
+    original_key: z.string().optional(),
+    transpose: z.number().int().optional(),
+    temp_note: z.string().optional(),
+  }),
+  z.object({
+    order: z.number().int().min(0),
+    type: z.literal('break'),
+    duration_minutes: z.number().positive('时长必须大于0'),
+    note: z.string().optional(),
+  }),
+  z.object({
+    order: z.number().int().min(0),
+    type: z.literal('game'),
+    description: z.string().min(1, '描述不能为空'),
+  }),
+]);
+
+const setlistSchema = z.object({
+  items: z.array(setlistItemSchema),
+});
+
 // ==================== 辅助函数 ====================
 
 /**
@@ -443,5 +472,50 @@ export async function gigRoutes(app: FastifyInstance) {
       .delete();
 
     return reply.status(204).send();
+  });
+
+  // ==================== Setlist 管理 ====================
+
+  /**
+   * PUT /api/gigs/:id/setlist — 更新歌单
+   */
+  app.put('/api/gigs/:id/setlist', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const user = getAuthUser(request);
+    if (!user) {
+      return reply.status(401).send({ error: '未提供认证令牌或令牌无效' });
+    }
+
+    const result = await requireGigAccess(app, request, id);
+    if (!result) {
+      const exists = await app.knex('gigs').where({ id }).first();
+      if (!exists) return reply.status(404).send({ error: '演出不存在' });
+      return reply.status(403).send({ error: '无权编辑歌单' });
+    }
+
+    if (user.role === 'musician') {
+      return reply.status(403).send({ error: '乐手无权编辑歌单' });
+    }
+
+    const parsed = setlistSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: '歌单数据格式错误',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    // 重新编号确保 order 连续
+    const items = parsed.data.items.map((item, index) => ({ ...item, order: index }));
+
+    const [gig] = await app.knex('gigs')
+      .where({ id })
+      .update({
+        setlist: JSON.stringify({ items }),
+        updated_at: app.knex.fn.now(),
+      })
+      .returning('*');
+
+    return { data: gig.setlist };
   });
 }

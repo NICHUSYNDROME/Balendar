@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
+import SetlistEditor from '../components/SetlistEditor';
 
 interface Participant {
   user_id: string;
@@ -332,6 +333,18 @@ export default function GigDetail() {
               </div>
             )}
           </div>
+
+          {/* 歌单编辑器 */}
+          {gig && (
+            <div style={{ marginTop: '16px' }}>
+              <SetlistEditor
+                gigId={gig.id}
+                initialItems={gig.setlist?.items || []}
+                onSaved={(items) => setGig((prev) => prev ? { ...prev, setlist: { items } } : null)}
+                canEdit={canEdit}
+              />
+            </div>
+          )}
 
           {/* 时间戳 */}
           <div style={{ color: '#999', fontSize: '12px', marginTop: '16px', textAlign: 'center' }}>

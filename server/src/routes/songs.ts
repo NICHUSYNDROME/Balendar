@@ -2,16 +2,24 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { getAuthUser, requireAdminOrManager } from '../lib/auth';
 
+// 12 平均律调性枚举
+const KEY_OPTIONS = [
+  'C', 'C#', 'D', 'D#', 'E', 'F',
+  'F#', 'G', 'G#', 'A', 'A#', 'B',
+] as const;
+
 const createSongSchema = z.object({
   name: z.string().min(1, '曲名不能为空').max(100),
   artist: z.string().min(1, '歌手不能为空').max(100),
-  original_key: z.string().max(10).optional(),
+  original_keys: z.array(z.enum(KEY_OPTIONS)).optional().default([]),
+  notes: z.string().optional(),
 });
 
 const updateSongSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   artist: z.string().min(1).max(100).optional(),
-  original_key: z.string().max(10).optional(),
+  original_keys: z.array(z.enum(KEY_OPTIONS)).optional(),
+  notes: z.string().optional(),
 });
 
 export async function songRoutes(app: FastifyInstance) {
@@ -54,7 +62,8 @@ export async function songRoutes(app: FastifyInstance) {
       .insert({
         name: parsed.data.name,
         artist: parsed.data.artist,
-        original_key: parsed.data.original_key || null,
+        original_keys: JSON.stringify(parsed.data.original_keys),
+        notes: parsed.data.notes || null,
       })
       .returning('*');
 
@@ -84,7 +93,10 @@ export async function songRoutes(app: FastifyInstance) {
     const updateData: Record<string, unknown> = {};
     if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
     if (parsed.data.artist !== undefined) updateData.artist = parsed.data.artist;
-    if (parsed.data.original_key !== undefined) updateData.original_key = parsed.data.original_key;
+    if (parsed.data.original_keys !== undefined) {
+      updateData.original_keys = JSON.stringify(parsed.data.original_keys);
+    }
+    if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes;
 
     const [song] = await app.knex('songs')
       .where({ id })

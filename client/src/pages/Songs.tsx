@@ -2,12 +2,21 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
+import CircleKeySelector from '../components/CircleKeySelector';
+
+// DB 音名 → 显示名（统一降号）
+const DB_TO_DISPLAY: Record<string, string> = {
+  'C': 'C', 'G': 'G', 'D': 'D', 'A': 'A', 'E': 'E', 'B': 'B',
+  'F#': 'F#', 'C#': 'C#',
+  'G#': 'Ab', 'D#': 'Eb', 'A#': 'Bb', 'F': 'F',
+};
 
 interface Song {
   id: string;
   name: string;
   artist: string;
-  original_key: string | null;
+  original_keys: string[];
+  notes: string | null;
 }
 
 export default function Songs() {
@@ -20,7 +29,7 @@ export default function Songs() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', artist: '', original_key: '' });
+  const [form, setForm] = useState({ name: '', artist: '', original_keys: [] as string[], notes: '' });
   const [saving, setSaving] = useState(false);
 
   const fetchSongs = async (keyword = '') => {
@@ -49,7 +58,7 @@ export default function Songs() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ name: '', artist: '', original_key: '' });
+    setForm({ name: '', artist: '', original_keys: [], notes: '' });
     setShowForm(true);
   };
 
@@ -58,7 +67,8 @@ export default function Songs() {
     setForm({
       name: song.name,
       artist: song.artist,
-      original_key: song.original_key || '',
+      original_keys: song.original_keys || [],
+      notes: song.notes || '',
     });
     setShowForm(true);
   };
@@ -67,11 +77,17 @@ export default function Songs() {
     if (!form.name.trim() || !form.artist.trim()) return;
     setSaving(true);
     try {
+      const payload = {
+        name: form.name.trim(),
+        artist: form.artist.trim(),
+        original_keys: form.original_keys,
+        notes: form.notes.trim() || '',
+      };
       if (editingId) {
-        const res = await api.put(`/songs/${editingId}`, form);
+        const res = await api.put(`/songs/${editingId}`, payload);
         setSongs((prev) => prev.map((s) => (s.id === editingId ? res.data.data : s)));
       } else {
-        const res = await api.post('/songs', form);
+        const res = await api.post('/songs', payload);
         setSongs((prev) => [...prev, res.data.data]);
       }
       setShowForm(false);
@@ -142,12 +158,19 @@ export default function Songs() {
               />
             </div>
             <div style={fieldStyle}>
-              <label style={labelStyle}>原调</label>
-              <input
-                style={inputStyle}
-                value={form.original_key}
-                onChange={(e) => setForm({ ...form, original_key: e.target.value })}
-                placeholder="如 C, G, Am"
+              <label style={labelStyle}>原调（按顺序添加，体现转调）</label>
+              <CircleKeySelector
+                value={form.original_keys}
+                onChange={(keys) => setForm((prev) => ({ ...prev, original_keys: keys }))}
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>备注</label>
+              <textarea
+                style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }}
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="如歌曲风格、特殊要求等"
               />
             </div>
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
@@ -178,8 +201,13 @@ export default function Songs() {
                 <span style={{ color: '#666', marginLeft: '8px', fontSize: '13px' }}>
                   {song.artist}
                 </span>
-                {song.original_key && (
-                  <span style={keyBadgeStyle}>{song.original_key}</span>
+                {song.original_keys?.map((key) => (
+                  <span key={key} style={keyBadgeStyle}>{DB_TO_DISPLAY[key] || key}</span>
+                ))}
+                {song.notes && (
+                  <span style={{ color: '#999', marginLeft: '8px', fontSize: '12px' }}>
+                    — {song.notes}
+                  </span>
                 )}
               </div>
               {canEdit && (
