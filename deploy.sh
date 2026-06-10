@@ -25,8 +25,9 @@ echo "===== 3/5 安装依赖 ====="
 ssh root@8.137.166.216 "cd /root/Balendar && pnpm install"
 
 echo ""
-echo "===== 4/5 构建 ====="
-ssh root@8.137.166.216 "cd /root/Balendar && pnpm --filter balendar-client run build && pnpm --filter balendar-server run build"
+echo "===== 4/5 数据库迁移 + 构建 ====="
+ssh root@8.137.166.216 "cd /root/Balendar && cd server && pnpm run db:migrate 2>&1 | tail -5"
+ssh root@8.137.166.216 "cd /root/Balendar && pnpm --filter balendar-server run build 2>&1 | tail -3 && pnpm --filter balendar-client run build 2>&1 | tail -3"
 
 echo ""
 echo "===== 5/5 重启服务 ====="

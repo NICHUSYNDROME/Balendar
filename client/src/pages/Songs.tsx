@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 import { useAuthStore } from '../stores/authStore';
 import CircleKeySelector from '../components/CircleKeySelector';
+import FileUploader from '../components/FileUploader';
 
 // DB 音名 → 显示名（统一降号）
 const DB_TO_DISPLAY: Record<string, string> = {
@@ -220,6 +221,7 @@ export default function Songs() {
                   </button>
                 </div>
               )}
+              <FileUploader songId={song.id} canEdit={canEdit} />
             </div>
           ))}
         </div>
