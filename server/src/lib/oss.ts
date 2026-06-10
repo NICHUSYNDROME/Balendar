@@ -41,6 +41,7 @@ function getClient(internal = false): any {
 
 /**
  * 生成上传签名 URL（前端直传 OSS 用 — 始终用公网 Endpoint）
+ * content-type 必须与前端上传时使用的 Content-Type 一致，否则签名校验失败
  */
 export async function getUploadUrl(
   fileName: string,
@@ -48,9 +49,11 @@ export async function getUploadUrl(
   expiresSeconds = 300,
 ): Promise<{ uploadUrl: string; fileUrl: string }> {
   const storeKey = `songs/${songId}/${fileName}`;
+  const contentType = 'application/octet-stream';
   const url = getClient(false).signatureUrl(storeKey, {
     method: 'PUT',
     expires: expiresSeconds,
+    'content-type': contentType,
   });
   return {
     uploadUrl: url,

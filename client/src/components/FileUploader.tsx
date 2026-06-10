@@ -59,11 +59,11 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
       });
       const { uploadUrl, fileUrl } = signRes.data.data;
 
-      // 2. 直传 OSS
+      // 2. 直传 OSS（Content-Type 必须与签名时一致）
       await fetch(uploadUrl, {
         method: 'PUT',
         body: selectedFile,
-        headers: { 'Content-Type': selectedFile.type },
+        headers: { 'Content-Type': 'application/octet-stream' },
       });
 
       // 3. 记录文件信息
