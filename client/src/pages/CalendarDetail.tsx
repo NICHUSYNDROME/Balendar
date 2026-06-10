@@ -146,6 +146,26 @@ export default function CalendarDetail() {
         )}
       </div>
 
+      {/* 跳转演出日历 */}
+      <div style={{ marginBottom: '20px' }}>
+        <button
+          onClick={() => navigate(`/calendars/${id}/gigs`)}
+          style={{
+            background: '#3b82f6',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            padding: '10px 24px',
+            cursor: 'pointer',
+            fontSize: '15px',
+            fontWeight: 500,
+            width: '100%',
+          }}
+        >
+          📅 查看演出日历
+        </button>
+      </div>
+
       {/* 成员管理 */}
       <h2 style={{ fontSize: '18px', marginBottom: '12px' }}>成员</h2>
 

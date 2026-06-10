@@ -3,6 +3,8 @@ import { useAuthStore } from './stores/authStore';
 import Login from './pages/Login';
 import Calendars from './pages/Calendars';
 import CalendarDetail from './pages/CalendarDetail';
+import Gigs from './pages/Gigs';
+import GigDetail from './pages/GigDetail';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);
@@ -28,6 +30,22 @@ function App() {
           element={
             <ProtectedRoute>
               <CalendarDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/calendars/:calendarId/gigs"
+          element={
+            <ProtectedRoute>
+              <Gigs />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/calendars/:calendarId/gigs/:gigId"
+          element={
+            <ProtectedRoute>
+              <GigDetail />
             </ProtectedRoute>
           }
         />

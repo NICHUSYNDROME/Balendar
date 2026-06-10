@@ -1,10 +1,13 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
 import knex from 'knex';
 import config from '../knexfile';
 import { authRoutes } from './routes/auth';
 import { userRoutes } from './routes/users';
 import { calendarRoutes } from './routes/calendars';
+import { gigRoutes } from './routes/gigs';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -24,6 +27,14 @@ async function main() {
 
   server.decorate('knex', db);
 
+  // 生产环境: 注册静态文件服务
+  if (process.env.NODE_ENV === 'production') {
+    await server.register(fastifyStatic, {
+      root: path.join(__dirname, '../../client/dist'),
+      wildcard: false,
+    });
+  }
+
   server.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
@@ -31,6 +42,14 @@ async function main() {
   await server.register(authRoutes);
   await server.register(userRoutes);
   await server.register(calendarRoutes);
+  await server.register(gigRoutes);
+
+  // SPA fallback: 前端路由返回 index.html
+  if (process.env.NODE_ENV === 'production') {
+    server.get('/*', async (request, reply) => {
+      return reply.sendFile('index.html');
+    });
+  }
 
   const port = parseInt(process.env.PORT || '3000', 10);
   try {
