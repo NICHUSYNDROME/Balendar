@@ -30,6 +30,15 @@ interface FileUploaderProps {
   canEdit: boolean;
 }
 
+const buttonStyle: React.CSSProperties = {
+  background: '#f3f4f6',
+  border: '1px solid #ddd',
+  padding: '6px 12px',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  fontSize: '12px',
+};
+
 export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
   const [files, setFiles] = useState<SongFile[]>([]);
   const [showModal, setShowModal] = useState(false);
@@ -87,53 +96,30 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
     }
   };
 
-  // 按类型统计
-  const typeSummary = files.reduce<Record<string, number>>((acc, f) => {
-    acc[f.file_type] = (acc[f.file_type] || 0) + 1;
-    return acc;
-  }, {});
+  const fileChips = files.map(f => FILE_TYPE_LABELS[f.file_type] || '📄 其他');
 
   return (
     <>
-      {/* 触发按钮 */}
-      <div style={{ marginTop: 8 }}>
+      {/* 触发按钮 + 文件类型标签 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <button
           onClick={() => setShowModal(true)}
-          style={{
-            background: 'none',
-            border: '1px solid #e0e0e0',
-            borderRadius: 6,
-            padding: '4px 10px',
-            fontSize: 13,
-            cursor: 'pointer',
-            color: '#555',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
+          style={buttonStyle}
         >
           📁 文件
-          {files.length > 0 && (
-            <span style={{
-              background: '#3b82f6',
-              color: '#fff',
-              borderRadius: 10,
-              padding: '0 6px',
-              fontSize: 11,
-              lineHeight: '18px',
-            }}>
-              {files.length}
-            </span>
-          )}
         </button>
-        {/* 缩略信息 */}
-        {files.length > 0 && (
-          <span style={{ marginLeft: 8, fontSize: 12, color: '#999' }}>
-            {Object.entries(typeSummary).map(([type, count]) =>
-              `${FILE_TYPE_LABELS[type]?.split(' ')[1] || type}(${count})`
-            ).join(' · ')}
+        {fileChips.map((chip, i) => (
+          <span key={i} style={{
+            background: '#f0f0f0',
+            borderRadius: 4,
+            padding: '2px 8px',
+            fontSize: 12,
+            color: '#666',
+            cursor: 'pointer',
+          }} onClick={() => setShowModal(true)}>
+            {chip}
           </span>
-        )}
+        ))}
       </div>
 
       {/* 弹窗 */}

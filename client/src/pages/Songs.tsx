@@ -197,31 +197,38 @@ export default function Songs() {
         <div>
           {songs.map((song) => (
             <div key={song.id} style={cardStyle}>
-              <div style={{ flex: 1 }}>
-                <strong style={{ fontSize: '15px' }}>{song.name}</strong>
-                <span style={{ color: '#666', marginLeft: '8px', fontSize: '13px' }}>
-                  {song.artist}
-                </span>
-                {song.original_keys?.map((key) => (
-                  <span key={key} style={keyBadgeStyle}>{DB_TO_DISPLAY[key] || key}</span>
-                ))}
-                {song.notes && (
-                  <span style={{ color: '#999', marginLeft: '8px', fontSize: '12px' }}>
-                    — {song.notes}
+              {/* 行1：歌曲信息 + 操作按钮 */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <strong style={{ fontSize: '15px' }}>{song.name}</strong>
+                  <span style={{ color: '#666', fontSize: '13px' }}>
+                    {song.artist}
                   </span>
-                )}
-              </div>
-              {canEdit && (
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button onClick={() => openEdit(song)} style={smallBtnStyle}>
-                    编辑
-                  </button>
-                  <button onClick={() => handleDelete(song.id)} style={smallDangerBtnStyle}>
-                    删除
-                  </button>
+                  {song.original_keys?.map((key) => (
+                    <span key={key} style={keyBadgeStyle}>{DB_TO_DISPLAY[key] || key}</span>
+                  ))}
+                  {canEdit && (
+                    <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                      <button onClick={() => openEdit(song)} style={smallBtnStyle}>
+                        编辑
+                      </button>
+                      <button onClick={() => handleDelete(song.id)} style={smallDangerBtnStyle}>
+                        删除
+                      </button>
+                    </span>
+                  )}
                 </div>
-              )}
-              <FileUploader songId={song.id} canEdit={canEdit} />
+                {/* 行2：备注 */}
+                {song.notes && (
+                  <div style={{ color: '#999', fontSize: '12px', marginTop: 4 }}>
+                    {song.notes}
+                  </div>
+                )}
+                {/* 行3：文件 */}
+                <div style={{ marginTop: 8 }}>
+                  <FileUploader songId={song.id} canEdit={canEdit} />
+                </div>
+              </div>
             </div>
           ))}
         </div>
@@ -340,9 +347,6 @@ const inputStyle: React.CSSProperties = {
 };
 
 const cardStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
   padding: '14px 16px',
   marginBottom: '6px',
   background: '#fff',
