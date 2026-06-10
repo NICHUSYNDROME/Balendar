@@ -1,4 +1,15 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+// 尝试加载 .env（兼容本地 dev 和服务器部署的不同路径）
+const envPaths = [
+  path.resolve(__dirname, '../../.env'),  // from dist/src -> server/
+  path.resolve(process.cwd(), '.env'),    // from CWD
+  path.resolve(process.cwd(), 'server/.env'), // from project root -> server/
+];
+for (const p of envPaths) {
+  if (fs.existsSync(p)) { config({ path: p }); break; }
+}
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
