@@ -88,10 +88,13 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
 
   const handleDelete = async (file: SongFile) => {
     if (!confirm(`确定删除 ${file.original_name}？`)) return;
+    // 乐观更新：立即从界面移除，不等服务器回复
+    setFiles((prev) => prev.filter((f) => f.id !== file.id));
     try {
       await api.delete(`/song-files/${file.id}`);
-      await loadFiles();
     } catch {
+      // 失败则回滚：把文件加回来
+      setFiles((prev) => [...prev, file]);
       alert('删除失败');
     }
   };
