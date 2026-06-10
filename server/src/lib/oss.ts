@@ -74,10 +74,10 @@ export async function getDownloadUrl(
 }
 
 /**
- * 删除 OSS 文件（服务端操作，用内网减少延迟）
+ * 删除 OSS 文件
  */
 export async function deleteFile(storeKey: string): Promise<void> {
-  await getClient(true).delete(storeKey);
+  await getClient(false).delete(storeKey);
 }
 
 /**

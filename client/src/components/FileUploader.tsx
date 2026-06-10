@@ -30,13 +30,45 @@ interface FileUploaderProps {
   canEdit: boolean;
 }
 
-const buttonStyle: React.CSSProperties = {
+const btnStyle: React.CSSProperties = {
   background: '#f3f4f6',
   border: '1px solid #ddd',
   padding: '6px 12px',
   borderRadius: '4px',
   cursor: 'pointer',
   fontSize: '12px',
+};
+
+const primaryBtnStyle: React.CSSProperties = {
+  background: '#3b82f6',
+  color: '#fff',
+  border: 'none',
+  padding: '8px 16px',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontSize: '13px',
+  fontWeight: 600,
+};
+
+const inputStyle: React.CSSProperties = {
+  padding: '8px 10px',
+  borderRadius: '6px',
+  border: '1px solid #ddd',
+  fontSize: '13px',
+  outline: 'none',
+};
+
+const overlayStyle: React.CSSProperties = {
+  position: 'fixed', inset: 0, zIndex: 1000,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(0,0,0,0.4)',
+};
+
+const modalStyle: React.CSSProperties = {
+  background: '#fff', padding: 24, borderRadius: 12,
+  width: '90%', maxWidth: 520,
+  maxHeight: '80vh', overflow: 'auto',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
 };
 
 export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
@@ -88,14 +120,14 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
 
   const handleDelete = async (file: SongFile) => {
     if (!confirm(`确定删除 ${file.original_name}？`)) return;
-    // 乐观更新：立即从界面移除，不等服务器回复
+    // 乐观更新：立即从界面移除
     setFiles((prev) => prev.filter((f) => f.id !== file.id));
     try {
-      await api.delete(`/song-files/${file.id}`);
+      await api.delete(`/song-files/${file.id}`, { timeout: 5000 });
     } catch {
-      // 失败则回滚：把文件加回来
+      // 失败则回滚
       setFiles((prev) => [...prev, file]);
-      alert('删除失败');
+      alert('删除失败，服务器无响应');
     }
   };
 
@@ -121,7 +153,7 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <button
           onClick={() => setShowModal(true)}
-          style={buttonStyle}
+          style={btnStyle}
         >
           📁 文件
         </button>
@@ -142,27 +174,18 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
       {/* 弹窗 */}
       {showModal && (
         <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.4)',
-          }}
+          style={overlayStyle}
           onClick={() => setShowModal(false)}
         >
           <div
-            style={{
-              background: '#fff', borderRadius: 12,
-              width: '90%', maxWidth: 520,
-              maxHeight: '80vh', overflow: 'auto',
-              padding: 24,
-            }}
+            style={modalStyle}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 18 }}>📁 文件管理</h3>
               <button
                 onClick={() => setShowModal(false)}
-                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#999' }}
+                style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#999', padding: '4px 8px' }}
               >
                 ✕
               </button>
@@ -174,16 +197,27 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
                 display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
                 padding: 12, background: '#f9f9f9', borderRadius: 8, marginBottom: 16,
               }}>
-                <input
-                  type="file"
-                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                  style={{ fontSize: 13, flex: 1, minWidth: 140 }}
-                  disabled={uploading}
-                />
+                <label style={{
+                  ...inputStyle,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  cursor: 'pointer', width: 'auto', flex: 1, minWidth: 120,
+                  background: '#fff',
+                }}>
+                  <span style={{ color: '#666' }}>📎</span>
+                  <span style={{ color: selectedFile ? '#333' : '#999', fontSize: 13 }}>
+                    {selectedFile ? selectedFile.name : '选择文件'}
+                  </span>
+                  <input
+                    type="file"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    style={{ display: 'none' }}
+                    disabled={uploading}
+                  />
+                </label>
                 <select
                   value={fileType}
                   onChange={(e) => setFileType(e.target.value)}
-                  style={{ fontSize: 13, padding: '4px 8px' }}
+                  style={{ ...inputStyle, width: 'auto' }}
                 >
                   {FILE_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -193,9 +227,8 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
                   onClick={handleUpload}
                   disabled={!selectedFile || uploading}
                   style={{
-                    padding: '6px 16px', fontSize: 13,
-                    background: !selectedFile || uploading ? '#ccc' : '#3b82f6',
-                    color: '#fff', border: 'none', borderRadius: 6,
+                    ...primaryBtnStyle,
+                    opacity: !selectedFile || uploading ? 0.5 : 1,
                     cursor: !selectedFile || uploading ? 'not-allowed' : 'pointer',
                   }}
                 >
@@ -231,14 +264,10 @@ export default function FileUploader({ songId, canEdit }: FileUploaderProps) {
                     {canEdit && (
                       <button
                         onClick={() => handleDelete(file)}
-                        style={{
-                          border: 'none', background: 'none',
-                          color: '#ff4d4f', cursor: 'pointer',
-                          fontSize: 16, padding: '2px 6px', flexShrink: 0,
-                        }}
+                        style={btnStyle}
                         title="删除"
                       >
-                        🗑
+                        🗑 删除
                       </button>
                     )}
                   </div>

@@ -122,7 +122,7 @@ export async function uploadRoutes(app: FastifyInstance) {
     try {
       // 删除 OSS 文件
       const storeKey = extractStoreKey(file.file_url);
-      await deleteFile(storeKey).catch(() => {});
+      await deleteFile(storeKey);
     } catch {
       // OSS 删除失败不阻塞数据库删除
     }

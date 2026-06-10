@@ -3,6 +3,7 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: '/api',
   headers: { 'Content-Type': 'application/json' },
+  timeout: 10000, // 10 秒超时，避免请求挂死
 });
 
 // 请求拦截器：自动带 token
