@@ -33,6 +33,7 @@ function getClient(internal = false): any {
       accessKeyId,
       accessKeySecret,
       bucket: BUCKET,
+      secure: true,
     });
   }
   return externalClient;
