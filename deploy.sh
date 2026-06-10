@@ -30,7 +30,7 @@ ssh root@8.137.166.216 "cd /root/Balendar && pnpm --filter balendar-client run b
 
 echo ""
 echo "===== 5/5 重启服务 ====="
-ssh root@8.137.166.216 "fuser -k 3000/tcp 2>/dev/null; cd /root/Balendar && NODE_ENV=production nohup pnpm --filter balendar-server run dev > /root/balendar.log 2>&1 &"
+ssh root@8.137.166.216 "fuser -k 3000/tcp 2>/dev/null; cd /root/Balendar && NODE_ENV=production nohup node server/dist/src/index.js > /root/balendar.log 2>&1 &"
 sleep 3
 
 echo ""
