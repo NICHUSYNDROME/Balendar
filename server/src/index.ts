@@ -1,4 +1,4 @@
-import { config } from 'dotenv';
+import { config as dotenvConfig } from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 // 尝试加载 .env（兼容本地 dev 和服务器部署的不同路径）
@@ -8,14 +8,13 @@ const envPaths = [
   path.resolve(process.cwd(), 'server/.env'), // from project root -> server/
 ];
 for (const p of envPaths) {
-  if (fs.existsSync(p)) { config({ path: p }); break; }
+  if (fs.existsSync(p)) { dotenvConfig({ path: p }); break; }
 }
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
-import path from 'path';
 import knex from 'knex';
-import config from '../knexfile';
+import knexConfig from '../knexfile';
 import { authRoutes } from './routes/auth';
 import { userRoutes } from './routes/users';
 import { calendarRoutes } from './routes/calendars';
@@ -33,7 +32,7 @@ declare module 'fastify' {
 const server = Fastify({ logger: true });
 
 async function main() {
-  const db = knex(config.development);
+  const db = knex(knexConfig.development);
 
   await server.register(cors, {
     origin: ['http://localhost:5173'],
