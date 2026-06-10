@@ -4,7 +4,6 @@ const REGION = 'oss-cn-chengdu';
 const BUCKET = 'balendar-files';
 const INTERNAL_ENDPOINT = 'oss-cn-chengdu-internal.aliyuncs.com';
 const EXTERNAL_HOST = 'balendar-files.oss-cn-chengdu.aliyuncs.com';
-const EXTERNAL_ENDPOINT = 'https://oss-cn-chengdu.aliyuncs.com';
 
 let internalClient: any = null;
 let externalClient: any = null;
@@ -34,8 +33,6 @@ function getClient(internal = false): any {
       accessKeyId,
       accessKeySecret,
       bucket: BUCKET,
-      endpoint: EXTERNAL_ENDPOINT,
-      secure: true,
     });
   }
   return externalClient;
